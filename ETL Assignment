@@ -1,0 +1,49 @@
+import sqlite3
+import pandas as pd
+
+db_path = 'S30 ETL Assignment.db'
+
+def sql_solution(db_path):
+    conn = sqlite3.connect(db_path)
+    query = """
+    SELECT 
+        customers.customer_id AS Customer,
+        customers.age AS Age,
+        sales.item AS Item,
+        SUM(COALESCE(sales.quantity, 0)) AS Quantity
+    FROM 
+        sales
+    JOIN 
+        customers ON sales.customer_id = customers.customer_id
+    WHERE 
+        customers.age BETWEEN 18 AND 35
+    GROUP BY 
+        customers.customer_id, sales.item
+    HAVING 
+        SUM(COALESCE(sales.quantity, 0)) > 0
+    ORDER BY 
+        customers.customer_id, sales.item;
+    """
+    sql_data = pd.read_sql_query(query, conn)
+    sql_data.to_csv('output_sql.csv', sep=';', index=False)
+    conn.close()
+    print("SQL solution completed and saved as 'output_sql.csv'.")
+
+def pandas_solution(db_path):
+    conn = sqlite3.connect(db_path)
+    sales_df = pd.read_sql_query("SELECT * FROM sales", conn)
+    customers_df = pd.read_sql_query("SELECT * FROM customers", conn)
+    merged_df = pd.merge(sales_df, customers_df, on='customer_id')
+    filtered_df = merged_df[(merged_df['age'] >= 18) & (merged_df['age'] <= 35)]
+    grouped_df = (
+        filtered_df.groupby(['customer_id', 'age', 'item'], as_index=False)
+        .agg({'quantity': 'sum'})
+    )
+    result_df = grouped_df[grouped_df['quantity'] > 0]
+    result_df.columns = ['Customer', 'Age', 'Item', 'Quantity']
+    result_df.to_csv('output_pandas.csv', sep=';', index=False)
+    conn.close()
+    print("Pandas solution completed and saved as 'output_pandas.csv'.")
+
+sql_solution(db_path)
+pandas_solution(db_path)
